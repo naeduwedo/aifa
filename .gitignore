@@ -1,0 +1,13 @@
+# 依赖与构建产物
+node_modules/
+.next/
+out/
+dist/
+build/
+backend/bin/
+*.exe
+*.log
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
