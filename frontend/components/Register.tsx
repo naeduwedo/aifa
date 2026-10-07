@@ -5,9 +5,10 @@ import { useState } from "react";
 import { label } from "@/lib/i18n";
 import type { Lang } from "@/lib/types";
 
-export default function LoginStage({ lang }: { lang: Lang }) {
+export default function RegisterStage({ lang }: { lang: Lang }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +31,11 @@ export default function LoginStage({ lang }: { lang: Lang }) {
     setBusy(true);
     setError("");
     try {
-      const data = await post("/api/auth/otp", { email: email.trim(), locale: lang });
+      const data = await post("/api/auth/register", {
+        email: email.trim(),
+        displayName: displayName.trim(),
+        locale: lang,
+      });
       setDevCode(data.devCode || "");
       setSent(true);
     } catch (e) {
@@ -45,7 +50,7 @@ export default function LoginStage({ lang }: { lang: Lang }) {
     setError("");
     try {
       await post("/api/auth/verify", { email: email.trim(), code: code.trim() });
-      router.push(`/?lang=${lang}`);
+      router.push(`/account/profile?lang=${lang}`);
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -58,8 +63,8 @@ export default function LoginStage({ lang }: { lang: Lang }) {
     <div className="login-stage">
       <div className="login-card">
         <p className="mono-label">{label("accountTitle", lang)}</p>
-        <h1>{label("signInTitle", lang)}</h1>
-        <p className="lede">{label("signInIntro", lang)}</p>
+        <h1>{label("registerTitle", lang)}</h1>
+        <p className="lede">{label("registerIntro", lang)}</p>
 
         <form
           className="field"
@@ -69,6 +74,19 @@ export default function LoginStage({ lang }: { lang: Lang }) {
             else verify();
           }}
         >
+          <label htmlFor="displayName">{label("displayNameLabel", lang)}</label>
+          <input
+            id="displayName"
+            type="text"
+            required
+            maxLength={60}
+            autoComplete="name"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder={lang === "zh" ? "你的显示名" : "Your display name"}
+            disabled={sent}
+          />
+
           <label htmlFor="email">{label("emailLabel", lang)}</label>
           <input
             id="email"
@@ -78,6 +96,7 @@ export default function LoginStage({ lang }: { lang: Lang }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
+            disabled={sent}
           />
 
           {sent && (
@@ -98,7 +117,7 @@ export default function LoginStage({ lang }: { lang: Lang }) {
           {error && <p className="login-error">{error}</p>}
 
           <button className="login-submit" type="submit" disabled={busy}>
-            {!sent ? label("sendCode", lang) : label("verify", lang)}
+            {!sent ? label("register", lang) : label("verify", lang)}
           </button>
 
           {sent && !devCode && (
@@ -117,9 +136,9 @@ export default function LoginStage({ lang }: { lang: Lang }) {
         <button
           className="ghost-action"
           type="button"
-          onClick={() => router.push(`/account/register?lang=${lang}`)}
+          onClick={() => router.push(`/account/login?lang=${lang}`)}
         >
-          {label("needAccount", lang)}
+          {label("haveAccount", lang)}
         </button>
         <button className="ghost-action" type="button" onClick={() => router.push(`/?lang=${lang}`)}>
           {label("backHome", lang)}

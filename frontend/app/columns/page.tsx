@@ -1,6 +1,6 @@
 import ColumnsBoard from "@/components/ColumnsBoard";
 import { api, withLang } from "@/lib/server-api";
-import type { AuthorProfile, Lang } from "@/lib/types";
+import type { AuthorProfile, Lang, ManagedColumn } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +13,16 @@ export default async function ColumnsPage({
   const lang: Lang = sp.lang === "zh" ? "zh" : "en";
 
   let columnProfiles: AuthorProfile[] = [];
+  let managed: ManagedColumn[] = [];
   try {
-    const data = await api<{ columnProfiles: AuthorProfile[] }>(withLang("/api/columns", lang));
+    const data = await api<{ columnProfiles: AuthorProfile[]; columns: ManagedColumn[] }>(
+      withLang("/api/columns", lang),
+    );
     columnProfiles = data.columnProfiles ?? [];
+    managed = data.columns ?? [];
   } catch {
     columnProfiles = [];
   }
 
-  return <ColumnsBoard profiles={columnProfiles} lang={lang} />;
+  return <ColumnsBoard profiles={columnProfiles} columns={managed} lang={lang} />;
 }

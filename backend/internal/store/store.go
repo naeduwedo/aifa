@@ -58,17 +58,27 @@ func scanUser(row pgx.Row) (*model.User, error) {
 	return &u, nil
 }
 
-func (s *Store) CreateUser(ctx context.Context, email, locale string) (*model.User, error) {
-	local := strings.SplitN(email, "@", 2)[0]
-	name := strings.NewReplacer(".", " ", "-", " ", "_", " ").Replace(local)
+func (s *Store) CreateUser(ctx context.Context, email, locale, displayName string) (*model.User, error) {
+	if strings.TrimSpace(displayName) == "" {
+		local := strings.SplitN(email, "@", 2)[0]
+		displayName = strings.NewReplacer(".", " ", "-", " ", "_", " ").Replace(local)
+	}
 	var id int64
 	err := s.DB.QueryRow(ctx, `
 		INSERT INTO users (email, display_name, locale)
-		VALUES ($1,$2,$3) RETURNING id`, email, name, locale).Scan(&id)
+		VALUES ($1,$2,$3) RETURNING id`, email, strings.TrimSpace(displayName), locale).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
 	return s.GetUserByID(ctx, id)
+}
+
+// UpdateProfile stores the profile fields shown next to comments and bylines.
+func (s *Store) UpdateProfile(ctx context.Context, id int64, displayName, title, bio, avatarURL string) error {
+	_, err := s.DB.Exec(ctx, `
+		UPDATE users SET display_name=$2, title=$3, bio=$4, avatar_url=$5, updated_at=now()
+		WHERE id=$1`, id, displayName, title, bio, avatarURL)
+	return err
 }
 
 // ---------------------------------------------------------------- articles
@@ -94,18 +104,20 @@ type articleRow struct {
 	interaction  []byte
 	publishedAt  *time.Time
 	viewCount    int64
+	categoryID   *int64
+	columnID     *int64
 }
 
 const articleCols = `id, slug, author_id, date, status, issue_no, kicker_zh, kicker_en,
 	title_zh, title_en, dek_zh, dek_en, cover_image, cover_accent, back_cover::text,
-	reading_zh, reading_en, interaction::text, published_at, view_count`
+	reading_zh, reading_en, interaction::text, published_at, view_count, category_id, column_id`
 
 func scanArticle(row pgx.Row) (*articleRow, error) {
 	var a articleRow
 	err := row.Scan(&a.id, &a.slug, &a.authorID, &a.date, &a.status, &a.issueNo,
 		&a.kickerZh, &a.kickerEn, &a.titleZh, &a.titleEn, &a.dekZh, &a.dekEn,
 		&a.cover, &a.accent, &a.backCover, &a.readingZh, &a.readingEn,
-		&a.interaction, &a.publishedAt, &a.viewCount)
+		&a.interaction, &a.publishedAt, &a.viewCount, &a.categoryID, &a.columnID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -164,7 +176,7 @@ func collectArticles(rows pgx.Rows) ([]*articleRow, error) {
 		err := rows.Scan(&a.id, &a.slug, &a.authorID, &a.date, &a.status, &a.issueNo,
 			&a.kickerZh, &a.kickerEn, &a.titleZh, &a.titleEn, &a.dekZh, &a.dekEn,
 			&a.cover, &a.accent, &a.backCover, &a.readingZh, &a.readingEn,
-			&a.interaction, &a.publishedAt, &a.viewCount)
+			&a.interaction, &a.publishedAt, &a.viewCount, &a.categoryID, &a.columnID)
 		if err != nil {
 			return nil, err
 		}
@@ -256,7 +268,20 @@ func (s *Store) Card(ctx context.Context, a *articleRow) model.Card {
 		ReadingEn:     a.readingEn,
 		Summary:       model.Text{Zh: a.dekZh, En: a.dekEn},
 		CoverImage:    a.cover,
+		Category:      s.categoryName(ctx, a.categoryID),
 	}
+}
+
+func (s *Store) categoryName(ctx context.Context, id *int64) model.Text {
+	if id == nil {
+		return model.Text{}
+	}
+	var zh, en string
+	if err := s.DB.QueryRow(ctx, `SELECT name_zh, name_en FROM categories WHERE id=$1`, *id).
+		Scan(&zh, &en); err != nil {
+		return model.Text{}
+	}
+	return model.Text{Zh: zh, En: en}
 }
 
 // ---------------------------------------------------------------- detail

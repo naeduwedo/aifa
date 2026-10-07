@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -51,6 +52,55 @@ func (a *API) RequestCode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, resp)
 }
 
+type registerRequest struct {
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	Locale      string `json:"locale"`
+}
+
+// Register starts the sign-up flow: it issues an OTP and remembers the
+// display name until VerifyCode creates the account.
+func (a *API) Register(w http.ResponseWriter, r *http.Request) {
+	var req registerRequest
+	if err := decode(r, &req); err != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		writeErr(w, 400, "invalid email")
+		return
+	}
+	if req.DisplayName == "" || len(req.DisplayName) > 60 {
+		writeErr(w, 400, "display name is required")
+		return
+	}
+	if _, err := a.Store.GetUserByEmail(r.Context(), req.Email); err == nil {
+		writeErr(w, 409, "account already exists — sign in instead")
+		return
+	} else if !errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 500, "lookup failed")
+		return
+	}
+	ok, err := a.Cache.RateLimit(r.Context(), "otp-request:"+req.Email, 5, 15*time.Minute)
+	if err == nil && !ok {
+		writeErr(w, 429, "too many codes requested, try later")
+		return
+	}
+	code, err := a.Auth.IssueOTP(r.Context(), req.Email)
+	if err != nil {
+		writeErr(w, 500, "could not send the code")
+		return
+	}
+	a.Cache.SavePendingRegister(r.Context(), req.Email, req.DisplayName, 15*time.Minute)
+	resp := map[string]any{"sent": true}
+	if a.Cfg.DevMode {
+		resp["devCode"] = code
+	}
+	writeJSON(w, 200, resp)
+}
+
 // VerifyCode exchanges the code for a session cookie.
 func (a *API) VerifyCode(w http.ResponseWriter, r *http.Request) {
 	var req otpVerify
@@ -71,11 +121,13 @@ func (a *API) VerifyCode(w http.ResponseWriter, r *http.Request) {
 
 	u, err := a.Store.GetUserByEmail(r.Context(), req.Email)
 	if err == store.ErrNotFound {
-		locale := "en"
-		if req.Code != "" {
-			locale = lang(r)
+		locale := lang(r)
+		displayName := ""
+		if pending := a.Cache.PendingRegister(r.Context(), req.Email); pending != "" {
+			displayName = pending
+			defer a.Cache.ClearPendingRegister(r.Context(), req.Email)
 		}
-		u, err = a.Store.CreateUser(r.Context(), req.Email, locale)
+		u, err = a.Store.CreateUser(r.Context(), req.Email, locale, displayName)
 		if err != nil {
 			writeErr(w, 500, "could not create account")
 			return
@@ -108,7 +160,8 @@ func publicUser(u *model.User) map[string]any {
 	return map[string]any{
 		"id": u.ID, "userNo": u.UserNo, "email": u.Email,
 		"displayName": u.DisplayName, "title": u.Title,
-		"avatarUrl": u.AvatarURL, "verified": u.Verified,
+		"avatarUrl": u.AvatarURL, "bio": u.Bio,
+		"verified": u.Verified,
 		"role": u.Role, "isAuthor": u.IsAuthor, "locale": u.Locale,
 	}
 }
@@ -145,14 +198,17 @@ func (a *API) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `json:"displayName"`
 		Title       string `json:"title"`
 		Bio         string `json:"bio"`
+		AvatarURL   string `json:"avatarUrl"`
 	}
 	if err := decode(r, &req); err != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}
-	_, err := a.Store.DB.Exec(r.Context(), `
-		UPDATE users SET display_name=$2, title=$3, bio=$4, updated_at=now() WHERE id=$1`,
-		u.ID, strings.TrimSpace(req.DisplayName), strings.TrimSpace(req.Title), strings.TrimSpace(req.Bio))
+	err := a.Store.UpdateProfile(r.Context(), u.ID,
+		strings.TrimSpace(req.DisplayName),
+		strings.TrimSpace(req.Title),
+		strings.TrimSpace(req.Bio),
+		strings.TrimSpace(req.AvatarURL))
 	if err != nil {
 		writeErr(w, 500, "update failed")
 		return

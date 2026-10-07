@@ -89,12 +89,17 @@ func main() {
 	mux.Handle("GET /api/academy", middleware.Chain(http.HandlerFunc(api.Academy), base...))
 	mux.Handle("GET /api/go-global", middleware.Chain(http.HandlerFunc(api.GoGlobal), base...))
 	mux.Handle("GET /api/about", middleware.Chain(http.HandlerFunc(api.About), base...))
+	mux.Handle("GET /api/settings", middleware.Chain(http.HandlerFunc(api.PublicSettings), base...))
+	mux.Handle("GET /api/site-pages", middleware.Chain(http.HandlerFunc(api.PublicSitePages), base...))
+	mux.Handle("GET /api/site-pages/{slug}", middleware.Chain(http.HandlerFunc(api.PublicSitePage), base...))
+	mux.Handle("GET /api/categories", middleware.Chain(http.HandlerFunc(api.PublicCategories), base...))
 
 	// ---- auth
 	authLimit := []func(http.Handler) http.Handler{
 		middleware.RateLimit(rdb, 30, time.Minute),
 	}
 	mux.Handle("POST /api/auth/otp", middleware.Chain(http.HandlerFunc(api.RequestCode), append(base, authLimit...)...))
+	mux.Handle("POST /api/auth/register", middleware.Chain(http.HandlerFunc(api.Register), append(base, authLimit...)...))
 	mux.Handle("POST /api/auth/verify", middleware.Chain(http.HandlerFunc(api.VerifyCode), append(base, authLimit...)...))
 	mux.Handle("POST /api/auth/logout", middleware.Chain(http.HandlerFunc(api.Logout), base...))
 	mux.Handle("GET /api/auth/me", middleware.Chain(http.HandlerFunc(api.Me), base...))
@@ -110,6 +115,35 @@ func main() {
 	mux.Handle("DELETE /api/authors/{no}/subscribe", middleware.Chain(protect(api.Subscribe), base...))
 	mux.Handle("POST /api/articles/{slug}/comments", middleware.Chain(protect(api.AddComment), base...))
 	mux.Handle("DELETE /api/comments/{id}", middleware.Chain(protect(api.DeleteComment), base...))
+
+	// ---- writer article publishing
+	mux.Handle("POST /api/articles", middleware.Chain(protectAuthor(api.CreateArticle), base...))
+	mux.Handle("PATCH /api/articles/{id}", middleware.Chain(protectAuthor(api.UpdateArticle), base...))
+	mux.Handle("DELETE /api/articles/{id}", middleware.Chain(protectAuthor(api.DeleteArticle), base...))
+	mux.Handle("GET /api/articles/edit", middleware.Chain(protectAuthor(api.EditArticle), base...))
+	mux.Handle("GET /api/articles/mine", middleware.Chain(protectAuthor(api.MyArticles), base...))
+
+	// ---- admin console
+	mux.Handle("GET /api/admin/stats", middleware.Chain(protectAdmin(api.AdminStats), base...))
+	mux.Handle("GET /api/admin/users", middleware.Chain(protectAdmin(api.AdminUsers), base...))
+	mux.Handle("PATCH /api/admin/users/{id}", middleware.Chain(protectAdmin(api.AdminUpdateUser), base...))
+	mux.Handle("DELETE /api/admin/users/{id}", middleware.Chain(protectAdmin(api.AdminDeleteUser), base...))
+	mux.Handle("GET /api/admin/categories", middleware.Chain(protectAdmin(api.AdminCategories), base...))
+	mux.Handle("POST /api/admin/categories", middleware.Chain(protectAdmin(api.AdminCreateCategory), base...))
+	mux.Handle("PATCH /api/admin/categories/{id}", middleware.Chain(protectAdmin(api.AdminUpdateCategory), base...))
+	mux.Handle("DELETE /api/admin/categories/{id}", middleware.Chain(protectAdmin(api.AdminDeleteCategory), base...))
+	mux.Handle("GET /api/admin/columns", middleware.Chain(protectAdmin(api.AdminColumns), base...))
+	mux.Handle("POST /api/admin/columns", middleware.Chain(protectAdmin(api.AdminCreateColumn), base...))
+	mux.Handle("PATCH /api/admin/columns/{id}", middleware.Chain(protectAdmin(api.AdminUpdateColumn), base...))
+	mux.Handle("DELETE /api/admin/columns/{id}", middleware.Chain(protectAdmin(api.AdminDeleteColumn), base...))
+	mux.Handle("GET /api/admin/articles", middleware.Chain(protectAdmin(api.AdminArticles), base...))
+	mux.Handle("DELETE /api/admin/articles/{id}", middleware.Chain(protectAdmin(api.AdminDeleteArticle), base...))
+	mux.Handle("GET /api/admin/pages", middleware.Chain(protectAdmin(api.AdminSitePages), base...))
+	mux.Handle("POST /api/admin/pages", middleware.Chain(protectAdmin(api.AdminCreateSitePage), base...))
+	mux.Handle("PATCH /api/admin/pages/{id}", middleware.Chain(protectAdmin(api.AdminUpdateSitePage), base...))
+	mux.Handle("DELETE /api/admin/pages/{id}", middleware.Chain(protectAdmin(api.AdminDeleteSitePage), base...))
+	mux.Handle("GET /api/admin/settings", middleware.Chain(protectAdmin(api.AdminGetSettings), base...))
+	mux.Handle("PUT /api/admin/settings", middleware.Chain(protectAdmin(api.AdminPutSettings), base...))
 
 	// ---- advisory, newsletter, feedback, analytics
 	mux.Handle("POST /api/consult", middleware.Chain(http.HandlerFunc(api.CreateConsult), append(base, middleware.RateLimit(rdb, 20, time.Minute))...))
@@ -146,6 +180,12 @@ func main() {
 
 // protect wraps a handler that must run for a signed-in reader.
 func protect(fn http.HandlerFunc) http.Handler { return middleware.RequireAuth(fn) }
+
+// protectAuthor wraps a handler that must run for a staff writer or admin.
+func protectAuthor(fn http.HandlerFunc) http.Handler { return middleware.RequireAuthor(fn) }
+
+// protectAdmin wraps a handler that must run for an administrator.
+func protectAdmin(fn http.HandlerFunc) http.Handler { return middleware.RequireAdmin(fn) }
 func findMigrations() string {
 	candidates := []string{"migrations", "backend/migrations", "../migrations", "../../migrations"}
 	if exe, err := os.Executable(); err == nil {

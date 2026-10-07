@@ -68,7 +68,7 @@ func CORS(origins []string) func(http.Handler) http.Handler {
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Vary", "Origin")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			}
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
@@ -126,6 +126,29 @@ func RequireAuth(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// RequireAdmin answers 403 unless the signed-in account carries the admin role.
+func RequireAdmin(next http.Handler) http.Handler {
+	return RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if u := UserFrom(r); u == nil || u.Role != "admin" {
+			Error(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
+}
+
+// RequireAuthor allows staff writers and admins to publish.
+func RequireAuthor(next http.Handler) http.Handler {
+	return RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := UserFrom(r)
+		if u == nil || !(u.IsAuthor || u.Role == "author" || u.Role == "admin") {
+			Error(w, http.StatusForbidden, "writer access required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
 }
 
 func WithStore(st *store.Store) func(http.Handler) http.Handler {

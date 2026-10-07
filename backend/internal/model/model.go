@@ -66,6 +66,7 @@ type Card struct {
 	ReadingEn     int    `json:"readingMinutesEn"`
 	Summary       Text   `json:"summary"`
 	CoverImage    string `json:"coverImage,omitempty"`
+	Category      Text   `json:"category"`
 }
 
 type DailyEntry struct {

@@ -58,6 +58,24 @@ func (c *Cache) VerifyOTP(ctx context.Context, email, code string) (bool, error)
 	return true, nil
 }
 
+// ---- pending registration (display name carried across the OTP step) -----
+
+func (c *Cache) SavePendingRegister(ctx context.Context, email, displayName string, ttl time.Duration) error {
+	return c.Client.Set(ctx, "reg:"+email, displayName, ttl).Err()
+}
+
+func (c *Cache) PendingRegister(ctx context.Context, email string) string {
+	v, err := c.Client.Get(ctx, "reg:"+email).Result()
+	if err != nil {
+		return ""
+	}
+	return v
+}
+
+func (c *Cache) ClearPendingRegister(ctx context.Context, email string) {
+	c.Client.Del(ctx, "reg:"+email)
+}
+
 // ---- sessions ------------------------------------------------------------
 
 func (c *Cache) SaveSession(ctx context.Context, token string, payload any, ttl time.Duration) error {

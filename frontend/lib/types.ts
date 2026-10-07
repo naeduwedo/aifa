@@ -17,6 +17,7 @@ export interface Card {
   readingMinutesEn: number;
   summary: Text;
   coverImage?: string;
+  category?: Text;
 }
 
 export interface DailyEntry {
@@ -76,6 +77,7 @@ export interface Account {
   displayName: Text;
   title: Text;
   avatarUrl: string;
+  bio: Text;
   verified: boolean;
   role: string;
   isAuthor: boolean;
@@ -231,4 +233,142 @@ export interface ConsultMessage {
   author: string;
   body: string;
   createdAt: string;
+}
+
+// ---------- account / admin console ----------
+
+export interface AdminUser {
+  id: number;
+  userNo: number;
+  email: string;
+  displayName: string;
+  title: string;
+  avatarUrl: string;
+  bio: string;
+  role: string;
+  locale: string;
+  verified: boolean;
+  isAuthor: boolean;
+  createdAt: string;
+  articles: number;
+}
+
+export interface CategoryRec {
+  id: number;
+  slug: string;
+  name: Text;
+  ord: number;
+  status: string;
+  articles: number;
+}
+
+export interface ColumnRec {
+  id: number;
+  slug: string;
+  title: Text;
+  desc: Text;
+  authorId: number | null;
+  authorName: string;
+  authorTitle: Text;
+  ord: number;
+  status: string;
+  articles: number;
+}
+
+export interface ManagedColumn extends Omit<ColumnRec, "articles"> {
+  articles: Card[];
+}
+
+export interface SitePageRec {
+  id: number;
+  slug: string;
+  title: Text;
+  summary: Text;
+  body: string;
+  status: string;
+  updatedAt: string;
+}
+
+export interface AdminArticleItem {
+  id: number;
+  slug: string;
+  title: Text;
+  date: string;
+  status: string;
+  issueNo: number;
+  authorId: number | null;
+  authorName: string;
+  category: Text;
+  viewCount: number;
+  updatedAt: string;
+}
+
+export interface AdminStats {
+  users: number;
+  authors: number;
+  articles: number;
+  published: number;
+  drafts: number;
+  comments: number;
+  subscribers: number;
+  columns: number;
+  categories: number;
+  sitePages: number;
+  viewsToday: number;
+}
+
+export interface WriteBlock {
+  type: string;
+  variant: string;
+  class: string;
+  width: string;
+  rows: number;
+  content: Record<string, any>;
+}
+
+export interface WritePage {
+  role: string;
+  section: Text;
+  title: Text;
+  dek: Text;
+  blocks: WriteBlock[];
+}
+
+export interface WriteSource {
+  url: string;
+  name: Text;
+  title: Text;
+  publishedAt: string;
+}
+
+export interface ArticleWrite {
+  slug: string;
+  date: string;
+  status: string;
+  issueNo: number;
+  kicker: Text;
+  title: Text;
+  dek: Text;
+  coverImage: string;
+  coverAccent: string;
+  readingMinutesZh: number;
+  readingMinutesEn: number;
+  categoryId: number | null;
+  columnId: number | null;
+  authorId: number | null;
+  pages: WritePage[];
+  sources: WriteSource[];
+}
+
+export interface ArticleEditPayload {
+  article: ArticleDetail;
+  meta: {
+    slug: string;
+    status: string;
+    issueNo: number;
+    date: string;
+    authorId: number | null;
+    categoryId: number | null;
+    columnId: number | null;
+  };
 }

@@ -123,6 +123,19 @@ func (a *API) DailyByDate(w http.ResponseWriter, r *http.Request) {
 // Article returns one issue with pages, blocks and sources.
 func (a *API) Article(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
+	meta, err := a.Store.ArticleMetaBySlug(r.Context(), slug)
+	if err != nil {
+		writeErr(w, 404, "article not found")
+		return
+	}
+	if meta.Status != "published" {
+		u := middleware.UserFrom(r)
+		allowed := u != nil && (u.Role == "admin" || (meta.AuthorID != nil && *meta.AuthorID == u.ID))
+		if !allowed {
+			writeErr(w, 404, "article not found")
+			return
+		}
+	}
 	detail, err := a.Store.ArticleDetail(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -155,7 +168,7 @@ func (a *API) Article(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, resp)
 }
 
-// Columns lists the column roster.
+// Columns lists the column roster plus admin-managed editorial columns.
 func (a *API) Columns(w http.ResponseWriter, r *http.Request) {
 	profiles, err := a.Store.ColumnProfiles(r.Context())
 	if err != nil {
@@ -165,7 +178,21 @@ func (a *API) Columns(w http.ResponseWriter, r *http.Request) {
 	if profiles == nil {
 		profiles = []model.AuthorProfile{}
 	}
-	writeJSON(w, 200, map[string]any{"columnProfiles": profiles})
+	type columnOut struct {
+		store.ColumnRec
+		Articles []model.Card `json:"articles"`
+	}
+	columns := []columnOut{}
+	if managed, err := a.Store.PublicColumns(r.Context()); err == nil {
+		for _, c := range managed {
+			cards, _ := a.Store.ColumnCards(r.Context(), c.ID, 12)
+			if cards == nil {
+				cards = []model.Card{}
+			}
+			columns = append(columns, columnOut{ColumnRec: c, Articles: cards})
+		}
+	}
+	writeJSON(w, 200, map[string]any{"columnProfiles": profiles, "columns": columns})
 }
 
 // Author serves the public author page /u/:no

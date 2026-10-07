@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { L } from "@/lib/i18n";
-import type { Lang } from "@/lib/types";
+import { L, label } from "@/lib/i18n";
+import type { Account, Lang } from "@/lib/types";
 
 const NAV = [
   { key: "navDaily", href: "/" },
@@ -61,7 +61,7 @@ export default function Masthead() {
   const { night, toggle } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
-  const [account, setAccount] = useState<{ email: string } | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
   const isReader = pathname.startsWith("/u/");
 
   useEffect(() => {
@@ -130,9 +130,24 @@ export default function Masthead() {
             {L.library[lang]}
           </Link>
           {account ? (
-            <button className="masthead-subscribe" type="button" onClick={signOut}>
-              {L.signOut[lang]}
-            </button>
+            <>
+              <Link className="masthead-library" href={flipHref("/account/profile")}>
+                {label("profileEntry", lang)}
+              </Link>
+              {(account.isAuthor || account.role === "admin") && (
+                <Link className="masthead-library" href={flipHref("/account/publish")}>
+                  {label("writeEntry", lang)}
+                </Link>
+              )}
+              {account.role === "admin" && (
+                <Link className="masthead-library" href={flipHref("/admin")}>
+                  {label("consoleEntry", lang)}
+                </Link>
+              )}
+              <button className="masthead-subscribe" type="button" onClick={signOut}>
+                {L.signOut[lang]}
+              </button>
+            </>
           ) : (
             <Link className="masthead-subscribe" href={flipHref("/account/login")}>
               {L.signIn[lang]}
