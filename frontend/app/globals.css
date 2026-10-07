@@ -737,6 +737,7 @@ img { display: block; max-width: 100%; }
 .page-slot { position: absolute; overflow: hidden; }
 .page-slot .magazine-page { width: 100%; height: 100%; }
 .page-canvas .page-slot { box-shadow: 0 24px 70px #00000073; }
+.page-slot.is-cover { cursor: pointer; }
 
 /* flow mode: portrait / narrow screens scroll vertically ------------------- */
 
@@ -1192,6 +1193,13 @@ img { display: block; max-width: 100%; }
   padding: 0 6px;
   opacity: 0.85;
 }
+.reader-isle button.count {
+  min-width: 0;
+  min-height: 32px;
+  text-transform: none;
+}
+.reader-isle button.count:hover { background: #ffffff1f; opacity: 1; }
+.reader-isle button.count:disabled { cursor: default; background: none; opacity: 0.45; }
 .reader-turn {
   pointer-events: auto;
   width: 44px; height: 44px;

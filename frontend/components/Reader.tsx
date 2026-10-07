@@ -669,10 +669,11 @@ export default function Reader({
           <div className="spread-layer">
             {slots.map((s) => (
               <div
-                className="page-slot"
+                className={`page-slot${s.page.role === "cover" ? " is-cover" : ""}`}
                 data-side={s.side}
                 key={s.side}
                 style={{ left: s.x, top: geom.cy - geom.ph / 2, width: geom.pw, height: geom.ph }}
+                onClick={s.page.role === "cover" ? () => turnTo(1) : undefined}
               >
                 <PageFrame
                   {...frame}
@@ -788,8 +789,9 @@ export default function Reader({
         <div className="reader-scroll" ref={scrollRef}>
           {article.pages.map((p) => (
             <div
-              className="page-slot is-flow"
+              className={`page-slot is-flow${p.role === "cover" ? " is-cover" : ""}`}
               key={p.id}
+              onClick={p.role === "cover" ? () => scrollTo(2) : undefined}
               ref={(node) => {
                 pageRefs.current[p.pageNumber] = node;
               }}
@@ -823,9 +825,16 @@ export default function Reader({
 
       <div className={`reader-controls${controls ? "" : " is-hidden"}`}>
         <div className="reader-isle">
-          <span className="count">
+          <button
+            type="button"
+            className="count count-jump"
+            title={label("backToCover", lang)}
+            aria-label={label("backToCover", lang)}
+            disabled={wide ? idx <= 0 : page <= 1}
+            onClick={() => (wide ? jumpTo(1) : scrollTo(1))}
+          >
             {wide ? counter : page} / {totalPages}
-          </span>
+          </button>
           <button
             type="button"
             aria-pressed={toc}

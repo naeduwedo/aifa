@@ -36,6 +36,7 @@ export const L = {
   contents: { zh: "目录", en: "Contents" },
   prevPage: { zh: "上一页", en: "Previous page" },
   nextPage: { zh: "下一页", en: "Next page" },
+  backToCover: { zh: "回到封面", en: "Back to the cover" },
   hideControls: { zh: "隐藏控件", en: "Hide reader controls" },
   showControls: { zh: "显示控件", en: "Show reader controls" },
   share: { zh: "分享", en: "Share" },
